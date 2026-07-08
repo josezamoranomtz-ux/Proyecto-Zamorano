@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Proyecto Zamorano</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="login-screen" id="loginScreen">
+      <section class="login-panel">
+        <div>
+          <p class="eyebrow">Despacho juridico privado</p>
+          <h1>Proyecto Zamorano</h1>
+          <p class="login-copy">
+            Control profesional de clientes, expedientes, pagos, agenda y documentos.
+          </p>
+        </div>
+
+        <form id="loginForm" class="login-form">
+          <label>
+            Usuario
+            <input type="text" id="username" value="lic.zamorano" autocomplete="username" required />
+          </label>
+          <label>
+            Contrasena
+            <input type="password" id="password" value="zamorano2026" autocomplete="current-password" required />
+          </label>
+          <button type="submit">Entrar al sistema</button>
+          <p class="hint">Demo local: lic.zamorano / zamorano2026</p>
+        </form>
+      </section>
+    </main>
+
+    <div class="app hidden" id="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">Z</span>
+          <div>
+            <strong>Proyecto Zamorano</strong>
+            <small>Gestion juridica</small>
+          </div>
+        </div>
+        <nav class="nav" id="nav">
+          <button class="active" data-view="dashboard">Panel</button>
+          <button data-view="clients">Clientes</button>
+          <button data-view="cases">Expedientes</button>
+          <button data-view="payments">Pagos</button>
+          <button data-view="calendar">Agenda</button>
+          <button data-view="documents">Documentos</button>
+        </nav>
+        <button class="logout" id="logoutBtn">Cerrar sesion</button>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Sistema privado</p>
+            <h2 id="viewTitle">Panel principal</h2>
+          </div>
+          <div class="user-chip">
+            <span></span>
+            Lic. Zamorano
+          </div>
+        </header>
+
+        <section class="view" id="dashboardView">
+          <div class="stats-grid" id="statsGrid"></div>
+          <div class="split-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <h3>Alertas importantes</h3>
+              </div>
+              <div class="alert-list" id="alertList"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-head">
+                <h3>Proximas actuaciones</h3>
+              </div>
+              <div class="timeline" id="timeline"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view hidden" id="clientsView">
+          <div class="content-grid">
+            <form class="panel form-panel" id="clientForm">
+              <h3>Registrar cliente</h3>
+              <div class="form-grid">
+                <label>Nombre completo<input name="name" required /></label>
+                <label>Telefono<input name="phone" /></label>
+                <label>Correo<input name="email" type="email" /></label>
+                <label>Domicilio<input name="address" /></label>
+                <label>Tipo de asunto<input name="matter" /></label>
+                <label>Estado<select name="status"><option>Activo</option><option>Pendiente</option><option>Cerrado</option></select></label>
+                <label class="span-2">Observaciones<textarea name="notes"></textarea></label>
+              </div>
+              <button type="submit">Guardar cliente</button>
+            </form>
+            <article class="panel table-panel">
+              <div class="panel-head">
+                <h3>Clientes registrados</h3>
+                <input class="search" id="clientSearch" placeholder="Buscar cliente" />
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Nombre</th><th>Asunto</th><th>Estado</th><th>Telefono</th></tr></thead>
+                  <tbody id="clientsTable"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view hidden" id="casesView">
+          <div class="content-grid">
+            <form class="panel form-panel" id="caseForm">
+              <h3>Registrar expediente</h3>
+              <div class="form-grid">
+                <label>Numero interno<input name="number" required /></label>
+                <label>Cliente<input name="client" required /></label>
+                <label>Materia<select name="area"><option>Familiar</option><option>Civil</option><option>Penal</option><option>Mercantil</option><option>Agrario</option><option>Administrativo</option><option>Amparo</option><option>Transito</option><option>Laboral</option></select></label>
+                <label>Etapa procesal<input name="stage" /></label>
+                <label>Autoridad o juzgado<input name="court" /></label>
+                <label>Fecha de inicio<input name="startDate" type="date" /></label>
+                <label>Proxima actuacion<input name="nextAction" /></label>
+                <label>Estado<select name="status"><option>Activo</option><option>Pendiente</option><option>Cerrado</option><option>Urgente</option></select></label>
+                <label class="span-2">Descripcion<textarea name="description"></textarea></label>
+              </div>
+              <button type="submit">Guardar expediente</button>
+            </form>
+            <article class="panel table-panel">
+              <div class="panel-head">
+                <h3>Expedientes</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Numero</th><th>Cliente</th><th>Materia</th><th>Estado</th><th>Proxima actuacion</th></tr></thead>
+                  <tbody id="casesTable"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view hidden" id="paymentsView">
+          <div class="content-grid">
+            <form class="panel form-panel" id="paymentForm">
+              <h3>Registrar pago</h3>
+              <div class="form-grid">
+                <label>Cliente<input name="client" required /></label>
+                <label>Expediente<input name="caseNumber" /></label>
+                <label>Honorarios pactados<input name="fee" type="number" min="0" /></label>
+                <label>Anticipo<input name="advance" type="number" min="0" /></label>
+                <label>Pago parcial<input name="partial" type="number" min="0" /></label>
+                <label>Fecha limite<input name="dueDate" type="date" /></label>
+                <label>Estado<select name="status"><option>Pendiente</option><option>Pagado</option><option>Vencido</option></select></label>
+                <label>Comprobante<input name="receipt" placeholder="Folio o referencia" /></label>
+              </div>
+              <button type="submit">Guardar pago</button>
+            </form>
+            <article class="panel table-panel">
+              <div class="panel-head">
+                <h3>Cobranza</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Cliente</th><th>Honorarios</th><th>Saldo</th><th>Limite</th><th>Estado</th></tr></thead>
+                  <tbody id="paymentsTable"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view hidden" id="calendarView">
+          <div class="content-grid">
+            <form class="panel form-panel" id="reminderForm">
+              <h3>Agregar recordatorio</h3>
+              <div class="form-grid">
+                <label>Tipo<select name="type"><option>Audiencia</option><option>Cita con cliente</option><option>Vencimiento</option><option>Plazo legal</option><option>Notificacion</option></select></label>
+                <label>Fecha y hora<input name="date" type="datetime-local" required /></label>
+                <label>Expediente<input name="caseNumber" /></label>
+                <label>Prioridad<select name="priority"><option>Media</option><option>Baja</option><option>Alta</option><option>Urgente</option></select></label>
+                <label class="span-2">Detalle<textarea name="detail" required></textarea></label>
+              </div>
+              <button type="submit">Guardar recordatorio</button>
+            </form>
+            <article class="panel table-panel">
+              <div class="panel-head">
+                <h3>Agenda juridica</h3>
+              </div>
+              <div class="reminder-list" id="reminderList"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view hidden" id="documentsView">
+          <div class="content-grid">
+            <form class="panel form-panel" id="documentForm">
+              <h3>Clasificar documento</h3>
+              <div class="form-grid">
+                <label>Nombre del documento<input name="name" required /></label>
+                <label>Cliente<input name="client" /></label>
+                <label>Expediente<input name="caseNumber" /></label>
+                <label>Tipo<select name="type"><option>Contrato</option><option>Demanda</option><option>Escrito</option><option>Prueba</option><option>Recibo</option><option>Convenio</option><option>Imagen</option></select></label>
+                <label class="span-2">Archivo<input name="file" type="file" accept=".pdf,.doc,.docx,image/*" /></label>
+              </div>
+              <button type="submit">Guardar referencia</button>
+              <p class="hint">Esta primera version guarda la referencia local del documento. La carga real al servidor se agrega en la siguiente fase.</p>
+            </form>
+            <article class="panel table-panel">
+              <div class="panel-head">
+                <h3>Archivo documental</h3>
+                <input class="search" id="docSearch" placeholder="Buscar documento" />
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Documento</th><th>Cliente</th><th>Expediente</th><th>Tipo</th></tr></thead>
+                  <tbody id="documentsTable"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+        </section>
+      </section>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
