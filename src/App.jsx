@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createBackupBlob, getBackupWarningState, importBackupFromText } from './backupUtils';
+import { applyPurchaseTransaction, applySalesTransaction, getAccountingSummary } from './erpBusinessLogic';
 
 const STORAGE_KEY = 'proyecto-zamorano-data';
 const AUTH_KEY = 'proyecto-zamorano-auth';
@@ -149,6 +151,115 @@ const defaultData = {
     }
   ],
   generatedDocuments: [],
+  suppliers: [
+    {
+      id: 'sup-1',
+      name: 'Metal S.A. de C.V.',
+      contact: 'Ing. Laura',
+      email: 'compras@metal.com',
+      phone: '81 5555 0101',
+      address: 'Parque industrial Monterrey',
+      balance: 0
+    }
+  ],
+  inventoryItems: [
+    {
+      id: 'itm-1',
+      sku: 'MAT-001',
+      name: 'Acero galvanizado',
+      category: 'Material',
+      unit: 'kg',
+      cost: 240,
+      stock: 25,
+      minStock: 5,
+      description: 'Material base para producción'
+    }
+  ],
+  purchases: [
+    {
+      id: 'pur-1',
+      supplierId: 'sup-1',
+      itemId: 'itm-1',
+      quantity: 10,
+      unitCost: 240,
+      total: 2400,
+      date: '2026-07-01',
+      dueDate: '2026-07-10',
+      status: 'recepcionada',
+      notes: 'Compra inicial para inventario'
+    }
+  ],
+  sales: [
+    {
+      id: 'sale-1',
+      clientId: 'c1',
+      itemId: 'itm-1',
+      quantity: 3,
+      unitPrice: 300,
+      total: 900,
+      date: '2026-07-02',
+      status: 'cobrada',
+      notes: 'Venta de prueba'
+    }
+  ],
+  accountingEntries: [
+    {
+      id: 'acc-1',
+      type: 'income',
+      amount: 900,
+      date: '2026-07-02',
+      entityId: 'c1',
+      description: 'Ingreso venta',
+      relatedModule: 'sales'
+    }
+  ],
+  enterprises: [
+    {
+      id: 'ent-1',
+      name: 'Proyecto Zamorano',
+      rfc: 'PZ-2026-001',
+      address: 'Monterrey, NL',
+      email: 'contacto@proyectozamorano.com',
+      phone: '81 1111 2222',
+      representative: 'Lic. Ana Zamorano',
+      status: 'activo',
+      observations: 'Empresa principal del grupo.'
+    }
+  ],
+  foundryOrders: [
+    {
+      id: 'fnd-1',
+      client: 'Herrería del Centro',
+      product: 'Puerta metálica',
+      quantity: 3,
+      priority: 'alta',
+      status: 'cotizada',
+      deliveryDate: '2026-07-20',
+      observations: 'Acero galvanizado.'
+    }
+  ],
+  constructionProjects: [
+    {
+      id: 'cst-1',
+      name: 'Obra residencial',
+      client: 'Familia Zamorano',
+      budget: 180000,
+      estimated: 45,
+      progress: 30,
+      status: 'en progreso',
+      observations: 'Avance de cimentación.'
+    }
+  ],
+  ruizGraphicsOrders: [
+    {
+      id: 'rg-1',
+      client: 'Muebles Ortega',
+      service: 'Diseño corporativo',
+      deliveryDate: '2026-07-18',
+      status: 'en producción',
+      observations: 'Material para campaña digital.'
+    }
+  ],
   dispatchProfile: {
     name: 'Despacho Zamorano',
     attorney: 'Lic. Ana Zamorano',
@@ -164,20 +275,61 @@ const defaultData = {
 };
 
 const menuItems = [
-  { id: 'dashboard', label: 'Panel principal' },
-  { id: 'clients', label: 'Clientes' },
-  { id: 'cases', label: 'Expedientes' },
-  { id: 'agenda', label: 'Agenda' },
-  { id: 'payments', label: 'Pagos' },
-  { id: 'documents', label: 'Documentos' },
-  { id: 'matters', label: 'Materias' },
-  { id: 'services', label: 'Servicios' },
-  { id: 'quotations', label: 'Cotizaciones' },
-  { id: 'invoices', label: 'Facturas y recibos' },
-  { id: 'templates', label: 'Contratos y machotes' },
-  { id: 'generator', label: 'Generador de documentos' },
-  { id: 'profile', label: 'Perfil del despacho' }
+  { id: 'dashboard', label: 'Centro de control' },
+  { id: 'clients', label: 'Jurídico · Clientes' },
+  { id: 'cases', label: 'Jurídico · Expedientes' },
+  { id: 'agenda', label: 'Jurídico · Agenda' },
+  { id: 'payments', label: 'Jurídico · Pagos' },
+  { id: 'documents', label: 'Jurídico · Documentos' },
+  { id: 'matters', label: 'Jurídico · Materias' },
+  { id: 'services', label: 'Jurídico · Servicios' },
+  { id: 'quotations', label: 'Jurídico · Cotizaciones' },
+  { id: 'invoices', label: 'Jurídico · Facturas y recibos' },
+  { id: 'templates', label: 'Jurídico · Contratos y machotes' },
+  { id: 'generator', label: 'Jurídico · Generador' },
+  { id: 'profile', label: 'Jurídico · Perfil' },
+  { id: 'enterprises', label: 'Empresas' },
+  { id: 'foundry', label: 'Herrería' },
+  { id: 'construction', label: 'Construcción' },
+  { id: 'ruizgraphics', label: 'Ruiz Graphics' },
+  { id: 'suppliers', label: 'Proveedores' },
+  { id: 'purchases', label: 'Compras' },
+  { id: 'sales', label: 'Ventas' },
+  { id: 'inventory', label: 'Inventario' },
+  { id: 'accounting', label: 'Contabilidad' },
+  { id: 'administration', label: 'Administración' },
+  { id: 'hr', label: 'Recursos humanos' },
+  { id: 'documentsHub', label: 'Documentos' },
+  { id: 'ai', label: 'Inteligencia artificial' },
+  { id: 'configuration', label: 'Configuración' }
 ];
+
+const moduleCatalog = [
+  { id: 'clients', label: 'Jurídico', description: 'Administración completa del despacho jurídico.', status: 'En desarrollo', icon: '⚖️', target: 'clients' },
+  { id: 'enterprises', label: 'Empresas', description: 'Centro administrativo para las empresas del grupo.', status: 'Preparado', icon: '🏢', target: 'enterprises' },
+  { id: 'foundry', label: 'Herrería', description: 'Gestión de clientes, órdenes, producción y entregas.', status: 'Preparado', icon: '🔨', target: 'foundry' },
+  { id: 'construction', label: 'Construcción', description: 'Control de obras, presupuestos, avances y bitácoras.', status: 'Preparado', icon: '🏗️', target: 'construction' },
+  { id: 'ruizgraphics', label: 'Ruiz Graphics', description: 'Diseño, producción y pedidos para el área gráfica.', status: 'Preparado', icon: '🎨', target: 'ruizgraphics' },
+  { id: 'inventory', label: 'Inventario', description: 'Herramientas, materiales, entradas, salidas y alertas.', status: 'Preparado', icon: '📦', target: 'inventory' },
+  { id: 'accounting', label: 'Contabilidad', description: 'Ingresos, egresos, flujo de efectivo y reportes.', status: 'Preparado', icon: '📊', target: 'accounting' },
+  { id: 'administration', label: 'Administración', description: 'Indicadores, productividad, estadísticas y planeación.', status: 'Preparado', icon: '🧭', target: 'administration' },
+  { id: 'hr', label: 'Recursos humanos', description: 'Trabajadores, asistencia, salarios y evaluaciones.', status: 'Preparado', icon: '👥', target: 'hr' },
+  { id: 'documentsHub', label: 'Documentos', description: 'Repositorio central de contratos, PDF, imágenes y plantillas.', status: 'Preparado', icon: '📁', target: 'documentsHub' },
+  { id: 'ai', label: 'Inteligencia artificial', description: 'Asistente empresarial para resumir y analizar información.', status: 'Preparado', icon: '🤖', target: 'ai' },
+  { id: 'configuration', label: 'Configuración', description: 'Usuarios, permisos, seguridad, respaldos y preferencias.', status: 'Preparado', icon: '⚙️', target: 'configuration' }
+];
+
+const roleAccessMap = {
+  admin: ['dashboard', 'clients', 'cases', 'agenda', 'payments', 'documents', 'matters', 'services', 'quotations', 'invoices', 'templates', 'generator', 'profile', 'enterprises', 'foundry', 'construction', 'ruizgraphics', 'suppliers', 'purchases', 'sales', 'inventory', 'accounting', 'administration', 'hr', 'documentsHub', 'ai', 'configuration'],
+  director: ['dashboard', 'clients', 'cases', 'agenda', 'payments', 'documents', 'matters', 'services', 'quotations', 'invoices', 'templates', 'generator', 'profile', 'enterprises', 'foundry', 'construction', 'ruizgraphics', 'suppliers', 'purchases', 'sales', 'inventory', 'accounting', 'administration', 'hr', 'documentsHub', 'ai', 'configuration'],
+  abogado: ['dashboard', 'clients', 'cases', 'agenda', 'payments', 'documents', 'matters', 'services', 'quotations', 'invoices', 'templates', 'generator', 'profile', 'enterprises', 'documentsHub', 'configuration'],
+  pasante: ['dashboard', 'clients', 'cases', 'documents', 'templates', 'generator', 'documentsHub'],
+  secretaria: ['dashboard', 'clients', 'cases', 'agenda', 'documents', 'templates', 'profile', 'documentsHub', 'configuration'],
+  contador: ['dashboard', 'payments', 'quotations', 'invoices', 'accounting', 'suppliers', 'purchases', 'sales', 'inventory', 'documentsHub', 'configuration'],
+  capturista: ['dashboard', 'clients', 'cases', 'services', 'quotations', 'invoices', 'generator', 'enterprises', 'suppliers', 'purchases', 'sales', 'inventory', 'documentsHub', 'configuration'],
+  trabajador: ['dashboard', 'clients', 'cases', 'agenda', 'payments', 'documents', 'matters', 'services', 'quotations', 'invoices', 'templates', 'generator', 'profile'],
+  invitado: ['dashboard', 'documentsHub', 'profile']
+};
 
 const matterOptions = ['Civil', 'Familiar', 'Penal', 'Mercantil', 'Agrario', 'Amparo', 'Laboral', 'Administrativo', 'Fiscal', 'Constitucional', 'Notarial', 'Sucesorio', 'Arrendamiento', 'Tránsito y accidentes', 'Daño moral', 'Cobranza judicial', 'Cobranza extrajudicial', 'Contratos', 'Propiedad', 'Derechos humanos', 'Seguridad social', 'Municipal', 'Ejidal', 'Migratorio'];
 const paymentForms = ['fijo', 'mensual', 'porcentaje', 'por etapa'];
@@ -201,6 +353,33 @@ function createId(prefix = 'id') {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function ModulePlaceholder({ title, description, areas, icon, status }) {
+  return (
+    <section className="section-card">
+      <div className="section-head">
+        <div>
+          <p className="brand-label">Arquitectura empresarial</p>
+          <h2>{title}</h2>
+        </div>
+        <span className="status-pill">{status}</span>
+      </div>
+      <div className="module-placeholder">
+        <div className="panel">
+          <div className="module-card-icon">{icon}</div>
+          <p className="helper-text">{description}</p>
+          <ul className="module-list">
+            {areas.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </div>
+        <div className="panel">
+          <h3>Estado de preparación</h3>
+          <p className="helper-text">Este módulo queda listo para crecer sin rehacer la estructura principal. La navegación, usuarios, permisos y documentos ya se mantienen alineados a la plataforma.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [credentials, setCredentials] = useState({ username: '', password: '' });
@@ -220,6 +399,11 @@ function App() {
       invoices: parsed.invoices || defaultData.invoices,
       templates: parsed.templates || defaultData.templates,
       generatedDocuments: parsed.generatedDocuments || defaultData.generatedDocuments,
+      suppliers: parsed.suppliers || defaultData.suppliers,
+      inventoryItems: parsed.inventoryItems || defaultData.inventoryItems,
+      purchases: parsed.purchases || defaultData.purchases,
+      sales: parsed.sales || defaultData.sales,
+      accountingEntries: parsed.accountingEntries || defaultData.accountingEntries,
       dispatchProfile: parsed.dispatchProfile || defaultData.dispatchProfile
     };
   });
@@ -234,6 +418,10 @@ function App() {
   const [templateForm, setTemplateForm] = useState({ id: null, name: '', matter: '', description: '', content: '' });
   const [templateEditingId, setTemplateEditingId] = useState(null);
   const [profileForm, setProfileForm] = useState(defaultData.dispatchProfile);
+  const [supplierForm, setSupplierForm] = useState({ id: null, name: '', contact: '', email: '', phone: '', address: '', balance: '' });
+  const [inventoryForm, setInventoryForm] = useState({ id: null, sku: '', name: '', category: 'Material', unit: 'pz', cost: '', stock: '', minStock: '', description: '' });
+  const [purchaseForm, setPurchaseForm] = useState({ id: null, supplierId: '', itemId: '', quantity: '', unitCost: '', total: '', date: new Date().toISOString().slice(0, 10), dueDate: '', status: 'pendiente', notes: '' });
+  const [saleForm, setSaleForm] = useState({ id: null, clientId: '', itemId: '', quantity: '', unitPrice: '', total: '', date: new Date().toISOString().slice(0, 10), status: 'pendiente', notes: '' });
   const [templateSearch, setTemplateSearch] = useState('');
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [invoiceFolioSearch, setInvoiceFolioSearch] = useState('');
@@ -241,6 +429,13 @@ function App() {
   const [generatedText, setGeneratedText] = useState('');
   const [reportQuoteId, setReportQuoteId] = useState(data.quotations[0]?.id || '');
   const [reportDraft, setReportDraft] = useState('');
+  const [backupStatus, setBackupStatus] = useState('');
+  const [backupFileName, setBackupFileName] = useState('proyecto-zamorano-backup.json');
+  const [lastBackupAt, setLastBackupAt] = useState('');
+  const [enterpriseForm, setEnterpriseForm] = useState({ id: null, name: '', rfc: '', address: '', email: '', phone: '', representative: '', status: 'activo', observations: '' });
+  const [foundryForm, setFoundryForm] = useState({ id: null, client: '', product: '', quantity: '', priority: 'media', status: 'cotizada', deliveryDate: '', observations: '' });
+  const [constructionForm, setConstructionForm] = useState({ id: null, name: '', client: '', budget: '', estimated: '', progress: '', status: 'planeación', observations: '' });
+  const [ruizGraphicsForm, setRuizGraphicsForm] = useState({ id: null, client: '', service: '', deliveryDate: '', status: 'en revisión', observations: '' });
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -265,29 +460,40 @@ function App() {
     }
   }, [data.quotations, reportQuoteId]);
 
-  const visibleMenu = useMemo(() => {
-    const base = menuItems.filter((item) => {
-      if (role === 'admin') return true;
-      if (role === 'trabajador') return ['dashboard', 'clients', 'cases', 'agenda', 'payments', 'documents', 'services', 'quotations', 'invoices', 'templates', 'generator'].includes(item.id);
-      if (role === 'capturista') return ['dashboard', 'clients', 'cases', 'services', 'quotations', 'invoices', 'generator'].includes(item.id);
-      if (role === 'abogado') return ['dashboard', 'cases', 'quotations', 'invoices', 'templates', 'generator', 'profile'].includes(item.id);
-      return false;
-    });
-    return base;
-  }, [role]);
+  const visibleMenu = useMemo(() => menuItems.filter((item) => (roleAccessMap[role] || []).includes(item.id)), [role]);
+
+  const visibleModules = useMemo(() => moduleCatalog.filter((item) => (roleAccessMap[role] || []).includes(item.id)), [role]);
 
   const dashboardStats = useMemo(() => {
+    const pendingActivities = data.agenda.filter((item) => item.status === 'pendiente').length;
+    const nextMeetings = data.agenda.filter((item) => item.status === 'pendiente').slice(0, 3);
     const pendingQuotes = data.quotations.filter((item) => item.status === 'pendiente' || item.status === 'aprobado').length;
     const pendingInvoices = data.invoices.filter((item) => item.status === 'pendiente' || item.status === 'parcial').length;
     const activeServices = data.services.filter((item) => item.status === 'activo').length;
+    const income = data.invoices.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    const alerts = data.quotations.filter((item) => item.status === 'vencido').length + data.invoices.filter((item) => item.status === 'vencido').length;
     return {
       clients: data.clients.length,
       cases: data.cases.length,
+      pendingActivities,
+      nextMeetings,
       pendingQuotes,
       pendingInvoices,
-      activeServices
+      activeServices,
+      income,
+      alerts,
+      suppliers: data.suppliers.length,
+      inventoryItems: data.inventoryItems.length,
+      purchases: data.purchases.length,
+      sales: data.sales.length,
+      enterprises: data.enterprises.length,
+      foundryOrders: data.foundryOrders.length,
+      constructionProjects: data.constructionProjects.length,
+      graphicsOrders: data.ruizGraphicsOrders.length
     };
   }, [data]);
+
+  const accountingSummary = useMemo(() => getAccountingSummary({ accountingEntries: data.accountingEntries }), [data.accountingEntries]);
 
   const filteredTemplates = useMemo(() => {
     if (!templateSearch) return data.templates;
@@ -323,6 +529,11 @@ function App() {
       setIsLoggedIn(true);
       window.localStorage.setItem(AUTH_KEY, 'admin:admin');
       setAuthError('');
+    } else if (normalized === 'director' && credentials.password === '123456') {
+      setRole('director');
+      setIsLoggedIn(true);
+      window.localStorage.setItem(AUTH_KEY, 'director:director');
+      setAuthError('');
     } else if (normalized === 'oficina' && credentials.password === '123456') {
       setRole('trabajador');
       setIsLoggedIn(true);
@@ -337,6 +548,26 @@ function App() {
       setRole('abogado');
       setIsLoggedIn(true);
       window.localStorage.setItem(AUTH_KEY, 'abogado:abogado');
+      setAuthError('');
+    } else if (normalized === 'pasante' && credentials.password === '123456') {
+      setRole('pasante');
+      setIsLoggedIn(true);
+      window.localStorage.setItem(AUTH_KEY, 'pasante:pasante');
+      setAuthError('');
+    } else if (normalized === 'secretaria' && credentials.password === '123456') {
+      setRole('secretaria');
+      setIsLoggedIn(true);
+      window.localStorage.setItem(AUTH_KEY, 'secretaria:secretaria');
+      setAuthError('');
+    } else if (normalized === 'contador' && credentials.password === '123456') {
+      setRole('contador');
+      setIsLoggedIn(true);
+      window.localStorage.setItem(AUTH_KEY, 'contador:contador');
+      setAuthError('');
+    } else if (normalized === 'invitado' && credentials.password === '123456') {
+      setRole('invitado');
+      setIsLoggedIn(true);
+      window.localStorage.setItem(AUTH_KEY, 'invitado:invitado');
       setAuthError('');
     } else {
       setAuthError('Usuario o contraseña incorrectos.');
@@ -524,6 +755,221 @@ function App() {
     setData((prev) => ({ ...prev, templates: [duplicated, ...prev.templates] }));
   };
 
+  const handleEnterpriseSubmit = (event) => {
+    event.preventDefault();
+    if (enterpriseForm.id) {
+      setData((prev) => ({ ...prev, enterprises: prev.enterprises.map((item) => item.id === enterpriseForm.id ? { ...item, ...enterpriseForm } : item) }));
+    } else {
+      setData((prev) => ({ ...prev, enterprises: [{ ...enterpriseForm, id: createId('enterprise') }, ...prev.enterprises] }));
+    }
+    setEnterpriseForm({ id: null, name: '', rfc: '', address: '', email: '', phone: '', representative: '', status: 'activo', observations: '' });
+  };
+
+  const handleEnterpriseEdit = (enterprise) => {
+    setEnterpriseForm(enterprise);
+  };
+
+  const handleEnterpriseDelete = (id) => {
+    if (window.confirm('¿Eliminar esta empresa?')) {
+      setData((prev) => ({ ...prev, enterprises: prev.enterprises.filter((item) => item.id !== id) }));
+    }
+  };
+
+  const handleFoundrySubmit = (event) => {
+    event.preventDefault();
+    if (foundryForm.id) {
+      setData((prev) => ({ ...prev, foundryOrders: prev.foundryOrders.map((item) => item.id === foundryForm.id ? { ...item, ...foundryForm, quantity: Number(foundryForm.quantity || 0) } : item) }));
+    } else {
+      setData((prev) => ({ ...prev, foundryOrders: [{ ...foundryForm, id: createId('foundry'), quantity: Number(foundryForm.quantity || 0) }, ...prev.foundryOrders] }));
+    }
+    setFoundryForm({ id: null, client: '', product: '', quantity: '', priority: 'media', status: 'cotizada', deliveryDate: '', observations: '' });
+  };
+
+  const handleFoundryEdit = (order) => {
+    setFoundryForm(order);
+  };
+
+  const handleFoundryDelete = (id) => {
+    if (window.confirm('¿Eliminar esta orden?')) {
+      setData((prev) => ({ ...prev, foundryOrders: prev.foundryOrders.filter((item) => item.id !== id) }));
+    }
+  };
+
+  const handleConstructionSubmit = (event) => {
+    event.preventDefault();
+    if (constructionForm.id) {
+      setData((prev) => ({ ...prev, constructionProjects: prev.constructionProjects.map((item) => item.id === constructionForm.id ? { ...item, ...constructionForm, budget: Number(constructionForm.budget || 0), estimated: Number(constructionForm.estimated || 0), progress: Number(constructionForm.progress || 0) } : item) }));
+    } else {
+      setData((prev) => ({ ...prev, constructionProjects: [{ ...constructionForm, id: createId('construction'), budget: Number(constructionForm.budget || 0), estimated: Number(constructionForm.estimated || 0), progress: Number(constructionForm.progress || 0) }, ...prev.constructionProjects] }));
+    }
+    setConstructionForm({ id: null, name: '', client: '', budget: '', estimated: '', progress: '', status: 'planeación', observations: '' });
+  };
+
+  const handleConstructionEdit = (project) => {
+    setConstructionForm(project);
+  };
+
+  const handleConstructionDelete = (id) => {
+    if (window.confirm('¿Eliminar este proyecto?')) {
+      setData((prev) => ({ ...prev, constructionProjects: prev.constructionProjects.filter((item) => item.id !== id) }));
+    }
+  };
+
+  const handleRuizGraphicsSubmit = (event) => {
+    event.preventDefault();
+    if (ruizGraphicsForm.id) {
+      setData((prev) => ({ ...prev, ruizGraphicsOrders: prev.ruizGraphicsOrders.map((item) => item.id === ruizGraphicsForm.id ? { ...item, ...ruizGraphicsForm } : item) }));
+    } else {
+      setData((prev) => ({ ...prev, ruizGraphicsOrders: [{ ...ruizGraphicsForm, id: createId('ruizgraphics') }, ...prev.ruizGraphicsOrders] }));
+    }
+    setRuizGraphicsForm({ id: null, client: '', service: '', deliveryDate: '', status: 'en revisión', observations: '' });
+  };
+
+  const handleRuizGraphicsEdit = (order) => {
+    setRuizGraphicsForm(order);
+  };
+
+  const handleRuizGraphicsDelete = (id) => {
+    if (window.confirm('¿Eliminar este pedido?')) {
+      setData((prev) => ({ ...prev, ruizGraphicsOrders: prev.ruizGraphicsOrders.filter((item) => item.id !== id) }));
+    }
+  };
+
+  const handleSupplierSubmit = (event) => {
+    event.preventDefault();
+    const payload = {
+      ...supplierForm,
+      balance: Number(supplierForm.balance || 0)
+    };
+    if (supplierForm.id) {
+      setData((prev) => ({ ...prev, suppliers: prev.suppliers.map((item) => item.id === supplierForm.id ? { ...item, ...payload } : item) }));
+    } else {
+      setData((prev) => ({ ...prev, suppliers: [{ ...payload, id: createId('supplier') }, ...prev.suppliers] }));
+    }
+    setSupplierForm({ id: null, name: '', contact: '', email: '', phone: '', address: '', balance: '' });
+  };
+
+  const handleSupplierEdit = (supplier) => {
+    setSupplierForm(supplier);
+  };
+
+  const handleSupplierDelete = (id) => {
+    if (window.confirm('¿Eliminar este proveedor?')) {
+      setData((prev) => ({ ...prev, suppliers: prev.suppliers.filter((item) => item.id !== id) }));
+    }
+  };
+
+  const handleInventorySubmit = (event) => {
+    event.preventDefault();
+    const payload = {
+      ...inventoryForm,
+      cost: Number(inventoryForm.cost || 0),
+      stock: Number(inventoryForm.stock || 0),
+      minStock: Number(inventoryForm.minStock || 0)
+    };
+    if (inventoryForm.id) {
+      setData((prev) => ({ ...prev, inventoryItems: prev.inventoryItems.map((item) => item.id === inventoryForm.id ? { ...item, ...payload } : item) }));
+    } else {
+      setData((prev) => ({ ...prev, inventoryItems: [{ ...payload, id: createId('item') }, ...prev.inventoryItems] }));
+    }
+    setInventoryForm({ id: null, sku: '', name: '', category: 'Material', unit: 'pz', cost: '', stock: '', minStock: '', description: '' });
+  };
+
+  const handleInventoryEdit = (item) => {
+    setInventoryForm(item);
+  };
+
+  const handleInventoryDelete = (id) => {
+    if (window.confirm('¿Eliminar este producto del inventario?')) {
+      setData((prev) => ({ ...prev, inventoryItems: prev.inventoryItems.filter((item) => item.id !== id) }));
+    }
+  };
+
+  const handlePurchaseSubmit = (event) => {
+    event.preventDefault();
+    const quantity = Number(purchaseForm.quantity || 0);
+    const unitCost = Number(purchaseForm.unitCost || 0);
+    const total = Number(purchaseForm.total || quantity * unitCost);
+    const payload = { ...purchaseForm, quantity, unitCost, total, date: purchaseForm.date || new Date().toISOString().slice(0, 10) };
+    if (!payload.supplierId || !payload.itemId) {
+      alert('Seleccione proveedor y producto para registrar la compra.');
+      return;
+    }
+    if (purchaseForm.id) {
+      setData((prev) => ({ ...prev, purchases: prev.purchases.map((item) => item.id === purchaseForm.id ? { ...item, ...payload } : item) }));
+    } else {
+      const transaction = applyPurchaseTransaction({
+        purchase: payload,
+        inventoryItems: data.inventoryItems,
+        suppliers: data.suppliers,
+        accountingEntries: data.accountingEntries
+      });
+      setData((prev) => ({
+        ...prev,
+        inventoryItems: transaction.inventoryItems,
+        suppliers: transaction.suppliers,
+        accountingEntries: transaction.accountingEntries,
+        purchases: [{ ...payload, id: createId('purchase') }, ...prev.purchases]
+      }));
+    }
+    setPurchaseForm({ id: null, supplierId: '', itemId: '', quantity: '', unitCost: '', total: '', date: new Date().toISOString().slice(0, 10), dueDate: '', status: 'pendiente', notes: '' });
+  };
+
+  const handlePurchaseEdit = (purchase) => {
+    setPurchaseForm(purchase);
+  };
+
+  const handlePurchaseDelete = (id) => {
+    if (window.confirm('¿Eliminar esta compra?')) {
+      setData((prev) => ({ ...prev, purchases: prev.purchases.filter((item) => item.id !== id) }));
+    }
+  };
+
+  const handleSaleSubmit = (event) => {
+    event.preventDefault();
+    const quantity = Number(saleForm.quantity || 0);
+    const unitPrice = Number(saleForm.unitPrice || 0);
+    const total = Number(saleForm.total || quantity * unitPrice);
+    const payload = { ...saleForm, quantity, unitPrice, total, date: saleForm.date || new Date().toISOString().slice(0, 10) };
+    if (!payload.clientId || !payload.itemId) {
+      alert('Seleccione cliente y producto para registrar la venta.');
+      return;
+    }
+    const currentItem = data.inventoryItems.find((item) => item.id === payload.itemId);
+    if (currentItem && currentItem.stock < quantity) {
+      alert('No hay suficiente inventario para completar esta venta.');
+      return;
+    }
+    if (saleForm.id) {
+      setData((prev) => ({ ...prev, sales: prev.sales.map((item) => item.id === saleForm.id ? { ...item, ...payload } : item) }));
+    } else {
+      const transaction = applySalesTransaction({
+        sale: payload,
+        inventoryItems: data.inventoryItems,
+        clients: data.clients,
+        accountingEntries: data.accountingEntries
+      });
+      setData((prev) => ({
+        ...prev,
+        inventoryItems: transaction.inventoryItems,
+        clients: transaction.clients,
+        accountingEntries: transaction.accountingEntries,
+        sales: [{ ...payload, id: createId('sale') }, ...prev.sales]
+      }));
+    }
+    setSaleForm({ id: null, clientId: '', itemId: '', quantity: '', unitPrice: '', total: '', date: new Date().toISOString().slice(0, 10), status: 'pendiente', notes: '' });
+  };
+
+  const handleSaleEdit = (sale) => {
+    setSaleForm(sale);
+  };
+
+  const handleSaleDelete = (id) => {
+    if (window.confirm('¿Eliminar esta venta?')) {
+      setData((prev) => ({ ...prev, sales: prev.sales.filter((item) => item.id !== id) }));
+    }
+  };
+
   const handleProfileSubmit = (event) => {
     event.preventDefault();
     setData((prev) => ({ ...prev, dispatchProfile: profileForm }));
@@ -578,8 +1024,54 @@ function App() {
     URL.revokeObjectURL(link.href);
   };
 
-  const canManageCatalog = role === 'admin' || role === 'abogado';
-  const canCreateOfficeDocs = role === 'admin' || role === 'trabajador' || role === 'capturista' || role === 'abogado';
+  const handleExportBackup = () => {
+    const exportedAt = new Date().toISOString();
+    const payload = createBackupBlob(data, exportedAt);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(payload);
+    link.download = backupFileName || 'proyecto-zamorano-backup.json';
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setLastBackupAt(exportedAt);
+    setBackupStatus('Respaldo exportado correctamente.');
+  };
+
+  const handleImportBackup = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const restored = importBackupFromText(text);
+      setData((prev) => ({ ...prev, ...restored.data }));
+      setLastBackupAt(restored.exportedAt || '');
+      setBackupStatus(`Respaldo importado desde ${file.name}.`);
+      if (window.confirm('¿Deseas reemplazar los datos actuales con el respaldo importado?')) {
+        setData(restored.data);
+      }
+    } catch (error) {
+      setBackupStatus(error.message || 'No se pudo importar el respaldo.');
+    }
+  };
+
+  const handlePrepareDbMigration = () => {
+    const summary = {
+      app: 'Proyecto Zamorano',
+      targetDatabase: 'PostgreSQL',
+      entities: ['clients', 'cases', 'agenda', 'payments', 'documents', 'matters', 'services', 'quotations', 'invoices', 'templates', 'generatedDocuments', 'dispatchProfile'],
+      notes: 'El formato actual está preparado para migrar a PostgreSQL mediante una tabla por entidad o un modelo JSONB.'
+    };
+    const blob = new Blob([JSON.stringify(summary, null, 2)], { type: 'application/json;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'proyecto-zamorano-migracion-postgresql.json';
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setBackupStatus('Plan de migración preparado para PostgreSQL.');
+  };
+
+  const backupWarning = getBackupWarningState(lastBackupAt);
+  const canManageCatalog = ['admin', 'director', 'abogado'].includes(role);
+  const canCreateOfficeDocs = ['admin', 'director', 'trabajador', 'capturista', 'abogado', 'secretaria'].includes(role);
 
   return (
     <div className="app-shell">
@@ -593,14 +1085,14 @@ function App() {
                 <h1>Proyecto Zamorano</h1>
               </div>
             </div>
-            <p className="login-copy">Ingrese con su cuenta para operar el despacho jurídico desde una sola plataforma.</p>
+            <p className="login-copy">Ingrese con su cuenta para operar la plataforma empresarial desde un único centro de control.</p>
             <form className="login-form" onSubmit={handleLoginSubmit}>
               <label>Usuario<input value={credentials.username} onChange={(event) => setCredentials({ ...credentials, username: event.target.value })} placeholder="admin" /></label>
               <label>Contraseña<input type="password" value={credentials.password} onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} placeholder="123456" /></label>
               {authError ? <p className="error-text">{authError}</p> : null}
               <button type="submit">Ingresar</button>
             </form>
-            <p className="hint-text">Accesos demo: admin, oficina, capturista, abogado · contraseña: 123456</p>
+            <p className="hint-text">Accesos demo: admin, director, oficina, capturista, abogado, pasante, secretaria, contador, invitado · contraseña: 123456</p>
           </div>
         </div>
       ) : (
@@ -635,16 +1127,269 @@ function App() {
               <section className="section-card">
                 <div className="section-head">
                   <div>
-                    <p className="brand-label">Panel principal</p>
-                    <h2>Resumen operativo del despacho</h2>
+                    <p className="brand-label">Centro de control</p>
+                    <h2>Plataforma empresarial modular</h2>
                   </div>
+                  <div className="topbar-pill">Rol: {role}</div>
                 </div>
                 <div className="stats-grid">
-                  <article className="stat-card"><span>Clientes</span><strong>{dashboardStats.clients}</strong></article>
-                  <article className="stat-card"><span>Expedientes</span><strong>{dashboardStats.cases}</strong></article>
-                  <article className="stat-card"><span>Cotizaciones pendientes</span><strong>{dashboardStats.pendingQuotes}</strong></article>
-                  <article className="stat-card"><span>Recibos pendientes</span><strong>{dashboardStats.pendingInvoices}</strong></article>
-                  <article className="stat-card"><span>Servicios activos</span><strong>{dashboardStats.activeServices}</strong></article>
+                  <article className="stat-card"><span>Actividades pendientes</span><strong>{dashboardStats.pendingActivities}</strong></article>
+                  <article className="stat-card"><span>Próximas reuniones</span><strong>{dashboardStats.nextMeetings.length}</strong></article>
+                  <article className="stat-card"><span>Cobros pendientes</span><strong>{dashboardStats.pendingQuotes}</strong></article>
+                  <article className="stat-card"><span>Ingresos</span><strong>{formatCurrency(dashboardStats.income)}</strong></article>
+                  <article className="stat-card"><span>Notificaciones</span><strong>{dashboardStats.pendingInvoices}</strong></article>
+                  <article className="stat-card"><span>Alertas importantes</span><strong>{dashboardStats.alerts}</strong></article>
+                </div>
+                <div className="dashboard-grid">
+                  <div className="panel">
+                    <h3>Resumen ejecutivo</h3>
+                    <ul className="item-list">
+                      <li><span>Clientes registrados</span><strong>{dashboardStats.clients}</strong></li>
+                      <li><span>Expedientes activos</span><strong>{dashboardStats.cases}</strong></li>
+                      <li><span>Servicios activos</span><strong>{dashboardStats.activeServices}</strong></li>
+                      <li><span>Recibos pendientes</span><strong>{dashboardStats.pendingInvoices}</strong></li>
+                    </ul>
+                  </div>
+                  <div className="panel">
+                    <h3>Módulos disponibles</h3>
+                    <p className="helper-text">Cada módulo comparte usuarios, permisos, configuración, documentos y base de datos, pero funciona de forma independiente.</p>
+                    <div className="module-grid">
+                      {visibleModules.map((module) => (
+                        <article key={module.id} className="module-card">
+                          <div className="module-card-icon">{module.icon}</div>
+                          <div className="module-card-header">
+                            <h3>{module.label}</h3>
+                            <span className="status-pill">{module.status}</span>
+                          </div>
+                          <p>{module.description}</p>
+                          <button type="button" className="nav-btn" onClick={() => setSection(module.target || module.id)}>Entrar</button>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {section === 'enterprises' && <ModulePlaceholder title="Empresas" description="Centro administrativo de todas las empresas del grupo y futuras sociedades." areas={['Registro de empresas', 'Logotipos y datos legales', 'Representantes y observaciones', 'Estado y seguimiento general']} icon="🏢" status="Arquitectura preparada" />}
+            {section === 'foundry' && <ModulePlaceholder title="Herrería" description="Administración de clientes, cotizaciones, materiales, producción, órdenes y entregas." areas={['Cotizaciones y órdenes de trabajo', 'Inventario y producción', 'Soldadura, cortes y entregas', 'Control operativo por proyecto']} icon="🔨" status="Arquitectura preparada" />}
+            {section === 'construction' && <ModulePlaceholder title="Construcción" description="Gestión operativa de obras, presupuestos, estimaciones, personales y bitácoras." areas={['Obras y presupuestos', 'Estimaciones y avances', 'Personal y materiales', 'Bitácoras y seguimiento']} icon="🏗️" status="Arquitectura preparada" />}
+            {section === 'ruizgraphics' && <ModulePlaceholder title="Ruiz Graphics" description="Módulo visual para diseño, impresión, gran formato, bordados y producción." areas={['Diseño gráfico y pedidos', 'Impresión y producción', 'Gran formato y serigrafía', 'Sublimación y entregas']} icon="🎨" status="Arquitectura preparada" />}
+            {section === 'suppliers' && (
+              <section className="section-card">
+                <div className="section-head"><div><p className="brand-label">Proveedores</p><h2>Registro y seguimiento de proveedores</h2></div></div>
+                <div className="service-grid">
+                  <div className="panel">
+                    <h3>Agregar o editar proveedor</h3>
+                    <form className="form-grid" onSubmit={handleSupplierSubmit}>
+                      <label>Nombre<input value={supplierForm.name} onChange={(event) => setSupplierForm({ ...supplierForm, name: event.target.value })} required /></label>
+                      <label>Contacto<input value={supplierForm.contact} onChange={(event) => setSupplierForm({ ...supplierForm, contact: event.target.value })} /></label>
+                      <label>Correo<input value={supplierForm.email} onChange={(event) => setSupplierForm({ ...supplierForm, email: event.target.value })} /></label>
+                      <label>Teléfono<input value={supplierForm.phone} onChange={(event) => setSupplierForm({ ...supplierForm, phone: event.target.value })} /></label>
+                      <label>Domicilio<input value={supplierForm.address} onChange={(event) => setSupplierForm({ ...supplierForm, address: event.target.value })} /></label>
+                      <label>Saldo inicial<input type="number" value={supplierForm.balance} onChange={(event) => setSupplierForm({ ...supplierForm, balance: event.target.value })} /></label>
+                      <div className="actions-row full-width"><button type="submit">{supplierForm.id ? 'Guardar proveedor' : 'Agregar proveedor'}</button>{supplierForm.id ? <button type="button" className="secondary-btn" onClick={() => setSupplierForm({ id: null, name: '', contact: '', email: '', phone: '', address: '', balance: '' })}>Cancelar</button> : null}</div>
+                    </form>
+                  </div>
+                  <div className="panel">
+                    <h3>Proveedores activos</h3>
+                    <div className="table-wrap"><table><thead><tr><th>Nombre</th><th>Contacto</th><th>Saldo</th><th>Acciones</th></tr></thead><tbody>{data.suppliers.map((supplier) => <tr key={supplier.id}><td>{supplier.name}</td><td>{supplier.contact}</td><td>{formatCurrency(supplier.balance)}</td><td><button className="table-btn" onClick={() => handleSupplierEdit(supplier)}>Editar</button><button className="table-btn danger" onClick={() => handleSupplierDelete(supplier.id)}>Eliminar</button></td></tr>)}</tbody></table></div>
+                  </div>
+                </div>
+              </section>
+            )}
+            {section === 'purchases' && (
+              <section className="section-card">
+                <div className="section-head"><div><p className="brand-label">Compras</p><h2>Registro de compras integrado con inventario y cuentas por pagar</h2></div></div>
+                <div className="service-grid">
+                  <div className="panel">
+                    <h3>Registrar compra</h3>
+                    <form className="form-grid" onSubmit={handlePurchaseSubmit}>
+                      <label>Proveedor<select value={purchaseForm.supplierId} onChange={(event) => setPurchaseForm({ ...purchaseForm, supplierId: event.target.value })} required><option value="">Seleccione</option>{data.suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select></label>
+                      <label>Producto<select value={purchaseForm.itemId} onChange={(event) => setPurchaseForm({ ...purchaseForm, itemId: event.target.value })} required><option value="">Seleccione</option>{data.inventoryItems.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                      <label>Cantidad<input type="number" value={purchaseForm.quantity} onChange={(event) => setPurchaseForm({ ...purchaseForm, quantity: event.target.value })} required /></label>
+                      <label>Costo unitario<input type="number" value={purchaseForm.unitCost} onChange={(event) => setPurchaseForm({ ...purchaseForm, unitCost: event.target.value })} required /></label>
+                      <label>Total<input type="number" value={purchaseForm.total} onChange={(event) => setPurchaseForm({ ...purchaseForm, total: event.target.value })} /></label>
+                      <label>Fecha<input type="date" value={purchaseForm.date} onChange={(event) => setPurchaseForm({ ...purchaseForm, date: event.target.value })} /></label>
+                      <label>Vencimiento<input type="date" value={purchaseForm.dueDate} onChange={(event) => setPurchaseForm({ ...purchaseForm, dueDate: event.target.value })} /></label>
+                      <label>Estado<select value={purchaseForm.status} onChange={(event) => setPurchaseForm({ ...purchaseForm, status: event.target.value })}><option value="pendiente">Pendiente</option><option value="recepcionada">Recepcionada</option><option value="pagada">Pagada</option></select></label>
+                      <label className="full-width">Notas<textarea value={purchaseForm.notes} onChange={(event) => setPurchaseForm({ ...purchaseForm, notes: event.target.value })} rows="2" /></label>
+                      <div className="actions-row full-width"><button type="submit">{purchaseForm.id ? 'Guardar compra' : 'Registrar compra'}</button>{purchaseForm.id ? <button type="button" className="secondary-btn" onClick={() => setPurchaseForm({ id: null, supplierId: '', itemId: '', quantity: '', unitCost: '', total: '', date: new Date().toISOString().slice(0, 10), dueDate: '', status: 'pendiente', notes: '' })}>Cancelar</button> : null}</div>
+                    </form>
+                  </div>
+                  <div className="panel">
+                    <h3>Historial de compras</h3>
+                    <div className="table-wrap"><table><thead><tr><th>Proveedor</th><th>Producto</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{data.purchases.map((purchase) => <tr key={purchase.id}><td>{data.suppliers.find((supplier) => supplier.id === purchase.supplierId)?.name || '—'}</td><td>{data.inventoryItems.find((item) => item.id === purchase.itemId)?.name || '—'}</td><td>{formatCurrency(purchase.total)}</td><td>{purchase.status}</td><td><button className="table-btn" onClick={() => handlePurchaseEdit(purchase)}>Editar</button><button className="table-btn danger" onClick={() => handlePurchaseDelete(purchase.id)}>Eliminar</button></td></tr>)}</tbody></table></div>
+                  </div>
+                </div>
+              </section>
+            )}
+            {section === 'sales' && (
+              <section className="section-card">
+                <div className="section-head"><div><p className="brand-label">Ventas</p><h2>Registro de ventas integrado con inventario, clientes e ingresos</h2></div></div>
+                <div className="service-grid">
+                  <div className="panel">
+                    <h3>Registrar venta</h3>
+                    <form className="form-grid" onSubmit={handleSaleSubmit}>
+                      <label>Cliente<select value={saleForm.clientId} onChange={(event) => setSaleForm({ ...saleForm, clientId: event.target.value })} required><option value="">Seleccione</option>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>
+                      <label>Producto<select value={saleForm.itemId} onChange={(event) => setSaleForm({ ...saleForm, itemId: event.target.value })} required><option value="">Seleccione</option>{data.inventoryItems.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                      <label>Cantidad<input type="number" value={saleForm.quantity} onChange={(event) => setSaleForm({ ...saleForm, quantity: event.target.value })} required /></label>
+                      <label>Precio unitario<input type="number" value={saleForm.unitPrice} onChange={(event) => setSaleForm({ ...saleForm, unitPrice: event.target.value })} required /></label>
+                      <label>Total<input type="number" value={saleForm.total} onChange={(event) => setSaleForm({ ...saleForm, total: event.target.value })} /></label>
+                      <label>Fecha<input type="date" value={saleForm.date} onChange={(event) => setSaleForm({ ...saleForm, date: event.target.value })} /></label>
+                      <label>Estado<select value={saleForm.status} onChange={(event) => setSaleForm({ ...saleForm, status: event.target.value })}><option value="pendiente">Pendiente</option><option value="cobrada">Cobrada</option><option value="cancelada">Cancelada</option></select></label>
+                      <label className="full-width">Notas<textarea value={saleForm.notes} onChange={(event) => setSaleForm({ ...saleForm, notes: event.target.value })} rows="2" /></label>
+                      <div className="actions-row full-width"><button type="submit">{saleForm.id ? 'Guardar venta' : 'Registrar venta'}</button>{saleForm.id ? <button type="button" className="secondary-btn" onClick={() => setSaleForm({ id: null, clientId: '', itemId: '', quantity: '', unitPrice: '', total: '', date: new Date().toISOString().slice(0, 10), status: 'pendiente', notes: '' })}>Cancelar</button> : null}</div>
+                    </form>
+                  </div>
+                  <div className="panel">
+                    <h3>Ventas registradas</h3>
+                    <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Producto</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{data.sales.map((sale) => <tr key={sale.id}><td>{data.clients.find((client) => client.id === sale.clientId)?.name || '—'}</td><td>{data.inventoryItems.find((item) => item.id === sale.itemId)?.name || '—'}</td><td>{formatCurrency(sale.total)}</td><td>{sale.status}</td><td><button className="table-btn" onClick={() => handleSaleEdit(sale)}>Editar</button><button className="table-btn danger" onClick={() => handleSaleDelete(sale.id)}>Eliminar</button></td></tr>)}</tbody></table></div>
+                  </div>
+                </div>
+              </section>
+            )}
+            {section === 'inventory' && (
+              <section className="section-card">
+                <div className="section-head"><div><p className="brand-label">Inventario</p><h2>Control de existencias y costos</h2></div></div>
+                <div className="service-grid">
+                  <div className="panel">
+                    <h3>Agregar o editar producto</h3>
+                    <form className="form-grid" onSubmit={handleInventorySubmit}>
+                      <label>SKU<input value={inventoryForm.sku} onChange={(event) => setInventoryForm({ ...inventoryForm, sku: event.target.value })} required /></label>
+                      <label>Nombre<input value={inventoryForm.name} onChange={(event) => setInventoryForm({ ...inventoryForm, name: event.target.value })} required /></label>
+                      <label>Categoría<input value={inventoryForm.category} onChange={(event) => setInventoryForm({ ...inventoryForm, category: event.target.value })} /></label>
+                      <label>Unidad<input value={inventoryForm.unit} onChange={(event) => setInventoryForm({ ...inventoryForm, unit: event.target.value })} /></label>
+                      <label>Costo<input type="number" value={inventoryForm.cost} onChange={(event) => setInventoryForm({ ...inventoryForm, cost: event.target.value })} /></label>
+                      <label>Stock<input type="number" value={inventoryForm.stock} onChange={(event) => setInventoryForm({ ...inventoryForm, stock: event.target.value })} /></label>
+                      <label>Stock mínimo<input type="number" value={inventoryForm.minStock} onChange={(event) => setInventoryForm({ ...inventoryForm, minStock: event.target.value })} /></label>
+                      <label className="full-width">Descripción<textarea value={inventoryForm.description} onChange={(event) => setInventoryForm({ ...inventoryForm, description: event.target.value })} rows="2" /></label>
+                      <div className="actions-row full-width"><button type="submit">{inventoryForm.id ? 'Guardar producto' : 'Agregar producto'}</button>{inventoryForm.id ? <button type="button" className="secondary-btn" onClick={() => setInventoryForm({ id: null, sku: '', name: '', category: 'Material', unit: 'pz', cost: '', stock: '', minStock: '', description: '' })}>Cancelar</button> : null}</div>
+                    </form>
+                  </div>
+                  <div className="panel">
+                    <h3>Catálogo de inventario</h3>
+                    <div className="table-wrap"><table><thead><tr><th>SKU</th><th>Nombre</th><th>Stock</th><th>Costo</th><th>Acciones</th></tr></thead><tbody>{data.inventoryItems.map((item) => <tr key={item.id}><td>{item.sku}</td><td>{item.name}</td><td>{item.stock}</td><td>{formatCurrency(item.cost)}</td><td><button className="table-btn" onClick={() => handleInventoryEdit(item)}>Editar</button><button className="table-btn danger" onClick={() => handleInventoryDelete(item.id)}>Eliminar</button></td></tr>)}</tbody></table></div>
+                  </div>
+                </div>
+              </section>
+            )}
+            {section === 'accounting' && (
+              <section className="section-card">
+                <div className="section-head"><div><p className="brand-label">Contabilidad básica</p><h2>Resumen financiero y movimientos registrados</h2></div></div>
+                <div className="stats-grid">
+                  <article className="stat-card"><span>Ingresos</span><strong>{formatCurrency(accountingSummary.income)}</strong></article>
+                  <article className="stat-card"><span>Cuentas por pagar</span><strong>{formatCurrency(accountingSummary.payable)}</strong></article>
+                  <article className="stat-card"><span>Cuentas por cobrar</span><strong>{formatCurrency(accountingSummary.receivable)}</strong></article>
+                  <article className="stat-card"><span>Saldo</span><strong>{formatCurrency(accountingSummary.balance)}</strong></article>
+                </div>
+                <div className="panel">
+                  <h3>Movimientos contables</h3>
+                  <div className="table-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th>Monto</th></tr></thead><tbody>{data.accountingEntries.map((entry) => <tr key={entry.id}><td>{formatDate(entry.date)}</td><td>{entry.type}</td><td>{entry.description}</td><td>{formatCurrency(entry.amount)}</td></tr>)}</tbody></table></div>
+                </div>
+              </section>
+            )}
+            {section === 'administration' && <ModulePlaceholder title="Administración" description="Indicadores, productividad, agenda empresarial, estadísticas y metas." areas={['Indicadores y productividad', 'Planeación y metas', 'Agenda empresarial', 'Estadísticas de rendimiento']} icon="🧭" status="Arquitectura preparada" />}
+            {section === 'hr' && <ModulePlaceholder title="Recursos humanos" description="Administración del talento y operaciones del personal del grupo." areas={['Trabajadores y abogados', 'Asistencia y salarios', 'Comisiones y evaluaciones', 'Contratos laborales']} icon="👥" status="Arquitectura preparada" />}
+            {section === 'documentsHub' && <ModulePlaceholder title="Documentos" description="Repositorio central de contratos, PDF, imágenes, videos, recibos y plantillas." areas={['Contratos y convenios', 'PDF e imágenes', 'Recibos y facturas', 'Plantillas y archivos']} icon="📁" status="Arquitectura preparada" />}
+            {section === 'ai' && <ModulePlaceholder title="Inteligencia artificial" description="Asistente empresarial preparado para resumir, generar y analizar contenido." areas={['Resumen de documentos', 'Generar escritos y contratos', 'Responder preguntas y analizar costos', 'Reportes y acompañamiento']} icon="🤖" status="Arquitectura preparada" />}
+            {section === 'configuration' && <ModulePlaceholder title="Configuración" description="Administración central de usuarios, roles, permisos, seguridad y temas visuales." areas={['Usuarios y roles', 'Permisos y seguridad', 'Respaldos y preferencias', 'Información fiscal y logotipos']} icon="⚙️" status="Arquitectura preparada" />}
+
+            {section === 'enterprises' && (
+              <section className="section-card">
+                <div className="section-head"><div><p className="brand-label">Empresas</p><h2>Registro de compañías del grupo</h2></div></div>
+                <div className="service-grid">
+                  <div className="panel">
+                    <h3>Agregar o editar empresa</h3>
+                    <form className="form-grid" onSubmit={handleEnterpriseSubmit}>
+                      <label>Nombre<input value={enterpriseForm.name} onChange={(event) => setEnterpriseForm({ ...enterpriseForm, name: event.target.value })} required /></label>
+                      <label>RFC<input value={enterpriseForm.rfc} onChange={(event) => setEnterpriseForm({ ...enterpriseForm, rfc: event.target.value })} /></label>
+                      <label>Domicilio<input value={enterpriseForm.address} onChange={(event) => setEnterpriseForm({ ...enterpriseForm, address: event.target.value })} /></label>
+                      <label>Correo<input value={enterpriseForm.email} onChange={(event) => setEnterpriseForm({ ...enterpriseForm, email: event.target.value })} /></label>
+                      <label>Teléfono<input value={enterpriseForm.phone} onChange={(event) => setEnterpriseForm({ ...enterpriseForm, phone: event.target.value })} /></label>
+                      <label>Representante<input value={enterpriseForm.representative} onChange={(event) => setEnterpriseForm({ ...enterpriseForm, representative: event.target.value })} /></label>
+                      <label>Estado<select value={enterpriseForm.status} onChange={(event) => setEnterpriseForm({ ...enterpriseForm, status: event.target.value })}><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="en revisión">En revisión</option></select></label>
+                      <label className="full-width">Observaciones<textarea value={enterpriseForm.observations} onChange={(event) => setEnterpriseForm({ ...enterpriseForm, observations: event.target.value })} rows="2" /></label>
+                      <div className="actions-row full-width"><button type="submit">{enterpriseForm.id ? 'Guardar empresa' : 'Agregar empresa'}</button>{enterpriseForm.id ? <button type="button" className="secondary-btn" onClick={() => setEnterpriseForm({ id: null, name: '', rfc: '', address: '', email: '', phone: '', representative: '', status: 'activo', observations: '' })}>Cancelar</button> : null}</div>
+                    </form>
+                  </div>
+                  <div className="panel">
+                    <h3>Empresas registradas</h3>
+                    <div className="table-wrap"><table><thead><tr><th>Nombre</th><th>Representante</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{data.enterprises.map((enterprise) => <tr key={enterprise.id}><td>{enterprise.name}</td><td>{enterprise.representative}</td><td>{enterprise.status}</td><td><button className="table-btn" onClick={() => handleEnterpriseEdit(enterprise)}>Editar</button><button className="table-btn danger" onClick={() => handleEnterpriseDelete(enterprise.id)}>Eliminar</button></td></tr>)}</tbody></table></div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {section === 'foundry' && (
+              <section className="section-card">
+                <div className="section-head"><div><p className="brand-label">Herrería</p><h2>Órdenes, producción y seguimiento</h2></div></div>
+                <div className="service-grid">
+                  <div className="panel">
+                    <h3>Registrar orden de trabajo</h3>
+                    <form className="form-grid" onSubmit={handleFoundrySubmit}>
+                      <label>Cliente<input value={foundryForm.client} onChange={(event) => setFoundryForm({ ...foundryForm, client: event.target.value })} required /></label>
+                      <label>Producto<input value={foundryForm.product} onChange={(event) => setFoundryForm({ ...foundryForm, product: event.target.value })} /></label>
+                      <label>Cantidad<input type="number" value={foundryForm.quantity} onChange={(event) => setFoundryForm({ ...foundryForm, quantity: event.target.value })} /></label>
+                      <label>Prioridad<select value={foundryForm.priority} onChange={(event) => setFoundryForm({ ...foundryForm, priority: event.target.value })}><option value="baja">Baja</option><option value="media">Media</option><option value="alta">Alta</option></select></label>
+                      <label>Estado<select value={foundryForm.status} onChange={(event) => setFoundryForm({ ...foundryForm, status: event.target.value })}><option value="cotizada">Cotizada</option><option value="en producción">En producción</option><option value="entregada">Entregada</option></select></label>
+                      <label>Fecha de entrega<input type="date" value={foundryForm.deliveryDate} onChange={(event) => setFoundryForm({ ...foundryForm, deliveryDate: event.target.value })} /></label>
+                      <label className="full-width">Observaciones<textarea value={foundryForm.observations} onChange={(event) => setFoundryForm({ ...foundryForm, observations: event.target.value })} rows="2" /></label>
+                      <div className="actions-row full-width"><button type="submit">{foundryForm.id ? 'Guardar orden' : 'Agregar orden'}</button>{foundryForm.id ? <button type="button" className="secondary-btn" onClick={() => setFoundryForm({ id: null, client: '', product: '', quantity: '', priority: 'media', status: 'cotizada', deliveryDate: '', observations: '' })}>Cancelar</button> : null}</div>
+                    </form>
+                  </div>
+                  <div className="panel">
+                    <h3>Órdenes activas</h3>
+                    <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Producto</th><th>Prioridad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{data.foundryOrders.map((order) => <tr key={order.id}><td>{order.client}</td><td>{order.product}</td><td>{order.priority}</td><td>{order.status}</td><td><button className="table-btn" onClick={() => handleFoundryEdit(order)}>Editar</button><button className="table-btn danger" onClick={() => handleFoundryDelete(order.id)}>Eliminar</button></td></tr>)}</tbody></table></div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {section === 'construction' && (
+              <section className="section-card">
+                <div className="section-head"><div><p className="brand-label">Construcción</p><h2>Obras, presupuestos y avances</h2></div></div>
+                <div className="service-grid">
+                  <div className="panel">
+                    <h3>Registrar proyecto</h3>
+                    <form className="form-grid" onSubmit={handleConstructionSubmit}>
+                      <label>Nombre<input value={constructionForm.name} onChange={(event) => setConstructionForm({ ...constructionForm, name: event.target.value })} required /></label>
+                      <label>Cliente<input value={constructionForm.client} onChange={(event) => setConstructionForm({ ...constructionForm, client: event.target.value })} /></label>
+                      <label>Presupuesto<input type="number" value={constructionForm.budget} onChange={(event) => setConstructionForm({ ...constructionForm, budget: event.target.value })} /></label>
+                      <label>Días estimados<input type="number" value={constructionForm.estimated} onChange={(event) => setConstructionForm({ ...constructionForm, estimated: event.target.value })} /></label>
+                      <label>Avance (%)<input type="number" value={constructionForm.progress} onChange={(event) => setConstructionForm({ ...constructionForm, progress: event.target.value })} /></label>
+                      <label>Estado<select value={constructionForm.status} onChange={(event) => setConstructionForm({ ...constructionForm, status: event.target.value })}><option value="planeación">Planeación</option><option value="en progreso">En progreso</option><option value="terminada">Terminada</option><option value="detenida">Detenida</option></select></label>
+                      <label className="full-width">Observaciones<textarea value={constructionForm.observations} onChange={(event) => setConstructionForm({ ...constructionForm, observations: event.target.value })} rows="2" /></label>
+                      <div className="actions-row full-width"><button type="submit">{constructionForm.id ? 'Guardar proyecto' : 'Agregar proyecto'}</button>{constructionForm.id ? <button type="button" className="secondary-btn" onClick={() => setConstructionForm({ id: null, name: '', client: '', budget: '', estimated: '', progress: '', status: 'planeación', observations: '' })}>Cancelar</button> : null}</div>
+                    </form>
+                  </div>
+                  <div className="panel">
+                    <h3>Proyectos activos</h3>
+                    <div className="table-wrap"><table><thead><tr><th>Proyecto</th><th>Cliente</th><th>Avance</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{data.constructionProjects.map((project) => <tr key={project.id}><td>{project.name}</td><td>{project.client}</td><td>{project.progress}%</td><td>{project.status}</td><td><button className="table-btn" onClick={() => handleConstructionEdit(project)}>Editar</button><button className="table-btn danger" onClick={() => handleConstructionDelete(project.id)}>Eliminar</button></td></tr>)}</tbody></table></div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {section === 'ruizgraphics' && (
+              <section className="section-card">
+                <div className="section-head"><div><p className="brand-label">Ruiz Graphics</p><h2>Pedidos de diseño y producción</h2></div></div>
+                <div className="service-grid">
+                  <div className="panel">
+                    <h3>Registrar pedido</h3>
+                    <form className="form-grid" onSubmit={handleRuizGraphicsSubmit}>
+                      <label>Cliente<input value={ruizGraphicsForm.client} onChange={(event) => setRuizGraphicsForm({ ...ruizGraphicsForm, client: event.target.value })} required /></label>
+                      <label>Servicio<input value={ruizGraphicsForm.service} onChange={(event) => setRuizGraphicsForm({ ...ruizGraphicsForm, service: event.target.value })} /></label>
+                      <label>Fecha de entrega<input type="date" value={ruizGraphicsForm.deliveryDate} onChange={(event) => setRuizGraphicsForm({ ...ruizGraphicsForm, deliveryDate: event.target.value })} /></label>
+                      <label>Estado<select value={ruizGraphicsForm.status} onChange={(event) => setRuizGraphicsForm({ ...ruizGraphicsForm, status: event.target.value })}><option value="en revisión">En revisión</option><option value="en producción">En producción</option><option value="entregado">Entregado</option></select></label>
+                      <label className="full-width">Observaciones<textarea value={ruizGraphicsForm.observations} onChange={(event) => setRuizGraphicsForm({ ...ruizGraphicsForm, observations: event.target.value })} rows="2" /></label>
+                      <div className="actions-row full-width"><button type="submit">{ruizGraphicsForm.id ? 'Guardar pedido' : 'Agregar pedido'}</button>{ruizGraphicsForm.id ? <button type="button" className="secondary-btn" onClick={() => setRuizGraphicsForm({ id: null, client: '', service: '', deliveryDate: '', status: 'en revisión', observations: '' })}>Cancelar</button> : null}</div>
+                    </form>
+                  </div>
+                  <div className="panel">
+                    <h3>Pedidos activos</h3>
+                    <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Servicio</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{data.ruizGraphicsOrders.map((order) => <tr key={order.id}><td>{order.client}</td><td>{order.service}</td><td>{order.status}</td><td><button className="table-btn" onClick={() => handleRuizGraphicsEdit(order)}>Editar</button><button className="table-btn danger" onClick={() => handleRuizGraphicsDelete(order.id)}>Eliminar</button></td></tr>)}</tbody></table></div>
+                  </div>
                 </div>
               </section>
             )}
@@ -938,6 +1683,26 @@ function App() {
                 </form>
               </section>
             )}
+
+            <section className="section-card">
+              <div className="section-head"><div><p className="brand-label">Respaldo y migración</p><h2>Exportar, importar y preparar datos</h2></div></div>
+              <div className="service-grid">
+                <div className="panel">
+                  <h3>Respaldo completo</h3>
+                  <label>Nombre del archivo<input value={backupFileName} onChange={(event) => setBackupFileName(event.target.value)} placeholder="proyecto-zamorano-backup.json" /></label>
+                  <div className="actions-row"><button type="button" onClick={handleExportBackup}>Exportar respaldo</button><label className="secondary-btn file-label"><span>Importar respaldo</span><input type="file" accept="application/json" onChange={handleImportBackup} /></label></div>
+                  <p className="helper-text"><strong>Último respaldo:</strong> {lastBackupAt ? formatDate(lastBackupAt) : 'Aún no se ha generado un respaldo.'}</p>
+                  {backupWarning.isWarning ? <p className="warning-text">Advertencia: han transcurrido {backupWarning.daysWithoutBackup ?? 'varios'} días desde el último respaldo. Se recomienda generar uno nuevo.</p> : <p className="helper-text">Los respaldos están al día.</p>}
+                  {backupStatus ? <p className="helper-text">{backupStatus}</p> : null}
+                  <p className="helper-text">Uso: exporta un archivo JSON de forma periódica y guárdalo en una carpeta segura. Cuando necesites restaurar, importa el archivo desde aquí.</p>
+                </div>
+                <div className="panel">
+                  <h3>Preparación para PostgreSQL o Supabase</h3>
+                  <p className="helper-text">El formato del respaldo está preparado para migrar fácilmente a una base de datos relacional sin cambiar la lógica principal de la aplicación. Las entidades actuales pueden mapearse a tablas o a JSONB.</p>
+                  <div className="actions-row"><button type="button" className="secondary-btn" onClick={handlePrepareDbMigration}>Descargar plan de migración</button></div>
+                </div>
+              </div>
+            </section>
 
             <section className="section-card">
               <div className="section-head"><div><p className="brand-label">Reporte de cobro imprimible</p><h2>Generar recibo o reporte</h2></div></div>
